@@ -1,0 +1,154 @@
+#include <ctype.h>
+#include <LiquidCrystal.h>
+
+const int rs = 15, en = 0, d4 = 17, d5 = 5, d6 = 18, d7 = 19;
+LiquidCrystal lcd(rs, en, d4, d5, d6, d7);
+int LED_pin = 12;
+int BUZZER_pin = 13;
+const int unitLength = 100;
+const int dotLength = unitLength;
+const int dashLength = unitLength * 3;
+const int charLength = unitLength * 3;
+const int wordGapLength = unitLength * 7;
+int pitch = 1000;
+
+const char* codeset[] = {
+  /* A */ ".-",
+  /* B */ "-...",
+  /* C */ "-.-.",
+  /* D */ "-..",
+  /* E */ ".",
+  /* F */ "..-.",
+  /* G */ "--.",
+  /* H */ "....",
+  /* I */ "..",
+  /* J */ ".---",
+  /* K */ "-.-",
+  /* L */ ".-..",
+  /* M */ "--",
+  /* N */ "-.",
+  /* O */ "---",
+  /* P */ ".--.",
+  /* Q */ "--.-",
+  /* R */ ".-.",
+  /* S */ "...",
+  /* T */ "-",
+  /* U */ "..-",
+  /* V */ "...-",
+  /* W */ ".--",
+  /* X */ "-..-",
+  /* Y */ "-.--",
+  /* Z */ "--.."
+};
+
+const char* getCode(char c) {
+  c = toupper(c);
+  if ('A' <= c && c <= 'Z') {
+    return codeset[c - 'A'];
+  }
+  return 0;
+}
+
+void setup() {
+  lcd.begin(16, 2);
+  pinMode(LED_pin, OUTPUT);
+  pinMode(BUZZER_pin, OUTPUT);
+  Serial.begin(9600);
+}
+
+void printDotDash(char symbol) {
+  digitalWrite(LED_pin, HIGH);
+  lcd.print(symbol);
+  Serial.print(symbol);
+
+  if (symbol == '.') {
+    tone(BUZZER_pin, pitch, dotLength);
+    delay(dotLength);
+  } else if (symbol == '-') {
+    tone(BUZZER_pin, pitch, dashLength);
+    delay(dashLength);
+  }
+
+  digitalWrite(LED_pin, LOW);
+  delay(unitLength);
+}
+
+void dot() {
+  printDotDash('.');
+}
+void dash() {
+  printDotDash('-');
+}
+
+void letter() {
+  Serial.print(" ");
+  delay(charLength);
+}
+
+void space() {
+  lcd.print("  ");
+  Serial.println();
+  delay(wordGapLength);
+}
+
+void printMorseCode(const char* code, int &cursorPos) {
+  for (int j = 0; code[j] != '\0'; j++) {
+    if (cursorPos >= 16) {
+      lcd.scrollDisplayLeft();
+    }
+    lcd.setCursor(cursorPos, 0);
+    if (code[j] == '.') {
+      dot();
+      if (cursorPos >= 16) {
+      lcd.scrollDisplayLeft();
+    }
+    } else if (code[j] == '-') {
+      dash();
+      if (cursorPos >= 16) {
+      lcd.scrollDisplayLeft();
+    }
+    }
+    cursorPos++;
+  }
+}
+
+void play(const char* input) {
+  int inputLength = strlen(input);
+  lcd.clear();
+  int cursorPos = 0;
+
+  for (int i = 0; i < inputLength; i++) {
+    char c = input[i];
+
+    if (c == ' ') {
+      space();
+      cursorPos+=2;
+    } else {
+      const char* code = getCode(c);
+      printMorseCode(code, cursorPos);
+      letter();
+      cursorPos+=1;
+      lcd.setCursor(i, 1); 
+      lcd.print(c); 
+    }
+  }
+}
+
+char inputTemp[255];
+int tempIndex = 0;
+
+void loop() {
+  while (Serial.available() > 0) {
+    char inputText = Serial.read();
+    if (inputText == '\n') {
+      inputTemp[tempIndex] = '\0';
+      play(inputTemp);
+      tempIndex = 0;
+      delay(500);
+    } else {
+      if (tempIndex < sizeof(inputTemp) - 1) {
+        inputTemp[tempIndex++] = inputText;
+      }
+    }
+  }
+}
